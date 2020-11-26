@@ -13,12 +13,14 @@
 # define CPU_TYPE_ARM64			(CPU_TYPE_ARM | CPU_ARCH_ABI64)
 #endif /* !CPU_TYPE_ARM64 */
 
-extern void dump_segments(FILE *obj_file);
+extern void dump_segments(FILE *obj_file, char *name);
 
 
 int main(int argc, char *argv[]) {
     if (argc < 2 || strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
+        printf("Mach-object segment dumper.\n");
         printf("Usage: %s <path to mach-o binary>\n", argv[0]);
+
         return 1;
     }
 
@@ -27,10 +29,11 @@ int main(int argc, char *argv[]) {
 
     if (obj_file == NULL) {
         printf("'%s' could not be opened.\n", argv[1]);
+
         return 1;
     }
 
-    dump_segments(obj_file);
+    dump_segments(obj_file, argv[1]);
     fclose(obj_file);
 
     (void) argc;
@@ -71,13 +74,14 @@ struct _cpu_type_names {
 static struct _cpu_type_names cpu_type_names[] = {
         {CPU_TYPE_I386,   "i386"},
         {CPU_TYPE_X86_64, "x86_64"},
-        {CPU_TYPE_ARM,    "arm"},
-        {CPU_TYPE_ARM64,  "arm64"}
+        {CPU_TYPE_ARM,    "arm32"},
+        {CPU_TYPE_ARM64,  "arm64/M1"}
 };
 
 
 static const char *cpu_type_name(cpu_type_t cpu_type) {
     static int cpu_type_names_size = sizeof(cpu_type_names) / sizeof(struct _cpu_type_names);
+
     for (int i = 0; i < cpu_type_names_size; i++) {
         if (cpu_type == cpu_type_names[i].cputype) {
             return cpu_type_names[i].cpu_name;
@@ -113,7 +117,7 @@ static void dump_segment_commands(FILE *obj_file, off_t offset, bool is_swap, ui
                 swap_segment_command_64(segment, 0);
             }
 
-            printf("segment %#02x: %s\n", i, segment->segname);
+            printf("\tsegment %02i at %#08llx: %s\n", i, segment->fileoff, segment->segname);
             free(segment);
         } else if (cmd->cmd == LC_SEGMENT) {
             struct segment_command *segment = load_bytes(obj_file, actual_offset, sizeof(struct segment_command));
@@ -122,13 +126,16 @@ static void dump_segment_commands(FILE *obj_file, off_t offset, bool is_swap, ui
                 swap_segment_command(segment, 0);
             }
 
-            printf("segment %#02x: %s\n", i, segment->segname);
+            printf("\tsegment %02i at %#08x: %s\n", i, segment->fileoff, segment->segname);
+
             free(segment);
         }
 
         actual_offset += cmd->cmdsize;
         free(cmd);
     }
+
+    printf("\n");
 }
 
 
@@ -147,7 +154,7 @@ static void dump_mach_header(FILE *obj_file, off_t offset, bool is_64, bool is_s
         ncmds = header->ncmds;
         load_commands_offset += header_size;
 
-        printf("CPU: %s\n", cpu_type_name(header->cputype));
+        printf("at %#08llx %s:\n", offset, cpu_type_name(header->cputype));
         free(header);
     } else {
         size_t header_size = sizeof(struct mach_header);
@@ -160,7 +167,7 @@ static void dump_mach_header(FILE *obj_file, off_t offset, bool is_64, bool is_s
         ncmds = header->ncmds;
         load_commands_offset += header_size;
 
-        printf("CPU: %s\n", cpu_type_name(header->cputype));
+        printf("at %#08llx %s:\n", offset, cpu_type_name(header->cputype));
         free(header);
     }
 
@@ -199,21 +206,21 @@ static void dump_fat_header(FILE *obj_file, int is_swap) {
 }
 
 
-void dump_segments(FILE *obj_file) {
+void dump_segments(FILE *obj_file, char *name) {
     uint32_t magic = read_magic(obj_file, 0);
     int is_64 = is_magic_64(magic);
     int is_swap = should_swap_bytes(magic);
     int fat = is_fat(magic);
 
-    printf("header type %#02x: ", magic);
+    printf("\nprint header segments for file: %s\n", name);
+    printf("mach-header type: ");
 
     if (fat) {
-        printf("FAT");
+        printf("fat id=%#06x\n\n", magic);
         dump_fat_header(obj_file, is_swap);
     } else {
-        printf("MACH");
+        printf("mach id=%#06x\n\n", magic);
         dump_mach_header(obj_file, 0, is_64, is_swap);
     }
 }
 
-/* EOF */
