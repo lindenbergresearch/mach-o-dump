@@ -117,7 +117,7 @@ static void dump_segment_commands(FILE *obj_file, off_t offset, bool is_swap, ui
                 swap_segment_command_64(segment, 0);
             }
 
-            printf("\tsegment %02i at %#08llx: %s\n", i, segment->fileoff, segment->segname);
+            printf("\tsegment #%02i at %#08llx: %s\n", i, segment->fileoff, segment->segname);
             free(segment);
         } else if (cmd->cmd == LC_SEGMENT) {
             struct segment_command *segment = load_bytes(obj_file, actual_offset, sizeof(struct segment_command));
@@ -126,7 +126,7 @@ static void dump_segment_commands(FILE *obj_file, off_t offset, bool is_swap, ui
                 swap_segment_command(segment, 0);
             }
 
-            printf("\tsegment %02i at %#08x: %s\n", i, segment->fileoff, segment->segname);
+            printf("\tsegment #%02i at %#08x: %s\n", i, segment->fileoff, segment->segname);
 
             free(segment);
         }
@@ -154,7 +154,7 @@ static void dump_mach_header(FILE *obj_file, off_t offset, bool is_64, bool is_s
         ncmds = header->ncmds;
         load_commands_offset += header_size;
 
-        printf("at %#08llx %s:\n", offset, cpu_type_name(header->cputype));
+        printf("%#08llx %s:\n", offset, cpu_type_name(header->cputype));
         free(header);
     } else {
         size_t header_size = sizeof(struct mach_header);
@@ -167,7 +167,7 @@ static void dump_mach_header(FILE *obj_file, off_t offset, bool is_64, bool is_s
         ncmds = header->ncmds;
         load_commands_offset += header_size;
 
-        printf("at %#08llx %s:\n", offset, cpu_type_name(header->cputype));
+        printf("%#08llx %s:\n", offset, cpu_type_name(header->cputype));
         free(header);
     }
 
@@ -212,14 +212,14 @@ void dump_segments(FILE *obj_file, char *name) {
     int is_swap = should_swap_bytes(magic);
     int fat = is_fat(magic);
 
-    printf("\nprint header segments for file: %s\n", name);
-    printf("mach-header type: ");
+    printf("\n");
+    printf("file        : %s\n", name);
+    printf("id          : %#06x\n", magic);
+    printf("header type : %s\n\n", fat ? "fat" : "mach");
 
     if (fat) {
-        printf("fat id=%#06x\n\n", magic);
         dump_fat_header(obj_file, is_swap);
     } else {
-        printf("mach id=%#06x\n\n", magic);
         dump_mach_header(obj_file, 0, is_64, is_swap);
     }
 }
